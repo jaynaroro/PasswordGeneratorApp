@@ -1,5 +1,6 @@
 package com.jays.passwordgenerator
 
+import com.jays.passwordgenerator.security.PinManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -23,10 +24,15 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
 import com.jays.passwordgenerator.data.PasswordDatabase
 import com.jays.passwordgenerator.data.SavedPasswordEntity
 import com.jays.passwordgenerator.ui.theme.NeonGreen
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.jays.passwordgenerator.ui.theme.ErrorRed
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -43,8 +49,132 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun PinLockScreen(
+    enteredPin: String,
+    onPinChange: (String) -> Unit,
+    onUnlock: () -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Vault Locked",
+            style = MaterialTheme.typography.titleLarge
+        )
+
+        OutlinedTextField(
+            value = enteredPin,
+            onValueChange = {
+                if (it.length <= 4) {
+                    onPinChange(it)
+                }
+            },
+            label = {
+                Text("Enter Pin")
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = LocalTextStyle.current.copy(
+                color = Color.DarkGray
+            )
+        )
+
+        Button(
+            onClick = onUnlock,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Unlock Vault")
+        }
+    }
+}
+
+
+
+
+@Composable
+fun CreatePinScreen(
+    enteredPin: String,
+    confirmPin: String,
+    onPinChange: (String) -> Unit,
+    onConfirmPinChange: (String) -> Unit,
+    onCreatePin: () -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Create Vault PIN",
+            style = MaterialTheme.typography.titleLarge
+        )
+
+        OutlinedTextField(
+            value = enteredPin,
+            onValueChange = {
+                if (it.length <= 4) {
+                    onPinChange(it)
+                }
+            },
+            label = {
+                Text("Enter 4-digit PIN")
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = confirmPin,
+            onValueChange = {
+                if (it.length <= 4) {
+                    onConfirmPinChange(it)
+                }
+            },
+            label = {
+                Text("Confirm PIN")
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Button(
+            onClick = onCreatePin,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Create PIN")
+        }
+    }
+}
+@Composable
 fun PasswordGeneratorScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    val pinManager = remember {
+        PinManager(context)
+    }
+
+    var isPinSet by remember {
+        mutableStateOf(pinManager.isPinSet())
+    }
+
+    var confirmPin by remember {
+        mutableStateOf("")
+    }
+
+    var enteredPin by remember {
+        mutableStateOf("")
+    }
+
+    var isUnlocked by remember{
+        mutableStateOf(false)
+    }
 
     var selectedTabIndex by remember {
         mutableIntStateOf(0)
@@ -125,7 +255,48 @@ fun PasswordGeneratorScreen() {
                 )
             }
 
+        if (!isUnlocked) {
 
+            if (!isPinSet) {
+                CreatePinScreen(
+                    enteredPin = enteredPin,
+                    confirmPin = confirmPin,
+                    onPinChange = {
+                        enteredPin = it
+                    },
+                    onConfirmPinChange = {
+                        confirmPin = it
+                    },
+                    onCreatePin = {
+                        if (
+                            enteredPin.length == 4 &&
+                            enteredPin == confirmPin
+                        ) {
+                            pinManager.savePin(enteredPin)
+                            isPinSet = true
+                            isUnlocked = true
+                            enteredPin = ""
+                            confirmPin = ""
+                        }
+                    }
+                )
+            } else {
+                PinLockScreen(
+                    enteredPin = enteredPin,
+                    onPinChange = {
+                        enteredPin = it
+                    },
+                    onUnlock = {
+                        if (pinManager.verifyPin(enteredPin)) {
+                            isUnlocked = true
+                            enteredPin = ""
+                        }
+                    }
+                )
+            }
+
+            return@Column
+        }
         // End New
         TabRow(
             selectedTabIndex = selectedTabIndex
@@ -168,6 +339,9 @@ fun PasswordGeneratorScreen() {
                             includeSymbols = includeSymbols
                         )
                     },
+                    onClearGeneratedPassword = {
+                        generatedPassword = "Tap Generate"
+                    },
                     onCopyGeneratedPassword = {
                         if (
                             generatedPassword != "Tap Generate" &&
@@ -206,7 +380,10 @@ fun PasswordGeneratorScreen() {
                                 ).show()
                             }
                         }
-                    }
+                    },
+
+
+
                 )
             }
 
@@ -243,6 +420,11 @@ fun PasswordGeneratorScreen() {
         }
     }
 }
+
+
+
+
+
         /// tabbed Generator
 
 @Composable
@@ -262,7 +444,8 @@ fun GeneratorTabContent(
     onPasswordTitleChange: (String) -> Unit,
     onGeneratePassword: () -> Unit,
     onCopyGeneratedPassword: () -> Unit,
-    onSavePassword: () -> Unit
+    onSavePassword: () -> Unit,
+    onClearGeneratedPassword: () -> Unit,
 ) {
 
     var showPasswordOptions by remember{
@@ -349,13 +532,40 @@ fun GeneratorTabContent(
                 }
             }
         }
-
+/*
         Button(
             onClick = onCopyGeneratedPassword,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Copy Generated Password")
-        }
+        } */
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(
+            onClick = onCopyGeneratedPassword,
+            modifier = Modifier.weight(1f)
+        ){
+            Text("Copy")
+            }
+
+            Button(
+                onClick = {
+                    if(generatedPassword != "Tap Generate"){
+                        onClearGeneratedPassword()
+                    }
+                },
+                modifier = Modifier.weight(1f),
+
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ErrorRed
+                )
+            )
+                {
+                Text("Clear")
+                }
+    }
 
         Text(
             text = "Password Length: ${passwordLength.toInt()}",
@@ -421,7 +631,10 @@ fun GeneratorTabContent(
             label = {
                 Text("Password Title")
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = LocalTextStyle.current.copy(
+                color = Color.DarkGray
+            )
         )
 
         Button(
