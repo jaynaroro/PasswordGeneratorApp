@@ -1,10 +1,10 @@
 ## Screenshots
 
 ### PIN Lock Screen
-![PIN Screen](screenshots/Login.png)
+![PIN Screen](Screenshots/Login.png)
 
 ### Generator Tab
-![Generator](screenshots/GeneratePwd.png)
+![Generator](Screenshots/GeneratePwd.png)
 
 ### Vault
-![Vault](screenshots/Saved.png)
+![Vault](Screenshots/Saved.png)
